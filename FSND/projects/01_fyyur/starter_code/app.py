@@ -200,6 +200,9 @@ def create_venue_submission():
   # TODO: modify data to be the data object returned from db insertion
   errorFlag=False
   try:
+      phone = request.form.get('phone').replace('-','')
+      if not phone.isdigit() or len(phone)!=10:
+          raise ValidationError()
       newVenue = Venue(
       name=request.form.get('name'),
       city=request.form.get('city'),
@@ -211,6 +214,9 @@ def create_venue_submission():
       facebook_link=request.form.get('facebook_link'))
       db.session.add(newVenue)
       db.session.commit()
+  except ValidationError:
+      errorFlag=True
+      flash('An error occurred. The phone number should be valid')
   except:
       errorFlag=True
       db.session.rollback()
@@ -400,6 +406,9 @@ def create_artist_submission():
   # called upon submitting the new artist listing form
   errorFlag=False
   try:
+      phone = request.form.get('phone').replace('-','')
+      if not phone.isdigit() or len(phone)!=10:
+          raise ValidationError()
       newArtist = Artist(
       name=request.form.get('name'),
       city=request.form.get('city'),
@@ -410,6 +419,9 @@ def create_artist_submission():
       facebook_link=request.form.get('facebook_link'))
       db.session.add(newArtist)
       db.session.commit()
+  except ValidationError:
+      errorFlag=True
+      flash('An error occurred. The phone number should be valid')
   except:
       errorFlag=True
       db.session.rollback()
