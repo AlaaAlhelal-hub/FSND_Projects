@@ -15,6 +15,9 @@ from forms import *
 from flask_migrate import Migrate
 import sys
 from datetime import *
+from wtforms.validators import ValidationError
+
+
 
 #----------------------------------------------------------------------------#
 # App Config.
@@ -144,7 +147,7 @@ def show_venue(venue_id):
   past_shows=[]
   upcoming_shows=[]
   for show in venue_shows:
-      if str(show.start_time) <= str(datetime.now()):
+      if  show.start_time <= datetime.now():
           past_shows.append(show)
       else:
           upcoming_shows.append(show)
@@ -282,12 +285,13 @@ def search_artists():
 def show_artist(artist_id):
     # shows the venue page with the given venue_id
     # TODO: replace with real venue data from the venues table, using venue_id
+
     artist = Artist.query.filter_by(id=artist_id).all()[0]
     artist_shows= db.session.query(Show).join(Artist, Show.artist_id == Artist.id).filter(Artist.id==artist_id).all()
     past_shows=[]
     upcoming_shows=[]
     for show in artist_shows:
-        if str(show.start_time) <= str(datetime.now()):
+        if show.start_time <= datetime.now():
             past_shows.append(show)
         else:
             upcoming_shows.append(show)
@@ -463,6 +467,10 @@ def create_show_submission():
   # TODO: insert form data as a new Show record in the db, instead
   errorFlag=False
   try:
+      Sdate=datetime.strptime(request.form['start_time'], '%Y-%m-%d %H:%M:%S')
+      if Sdate < datetime.today():
+          raise ValidationError()
+
       venueid=request.form.get('venue_id')
       artistid=request.form.get('artist_id')
       newShow = Show(artist_id=artistid,
@@ -474,21 +482,21 @@ def create_show_submission():
       artist.num_upcoming_shows = artist.num_upcoming_shows + 1
       db.session.add(newShow)
       db.session.commit()
+  except ValidationError:
+      errorFlag=True
+      flash('An error occurred. The start date should not be earlier than today')
   except:
       errorFlag=True
       db.session.rollback()
       print(sys.exc_info())
+      flash('An error occurred. Show could not be listed.')
   finally:
       db.session.close()
 
   if not errorFlag:
       # on successful db insert, flash success
       flash('Show was successfully listed!')
-  else:
-        # TODO: on unsuccessful db insert, flash an error instead.
-      flash('An error occurred. Show could not be listed.')
-  # e.g., flash('An error occurred. Show could not be listed.')
-  # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+
   return render_template('pages/home.html')
 
 @app.errorhandler(404)
