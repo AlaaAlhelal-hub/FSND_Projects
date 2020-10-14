@@ -441,7 +441,7 @@ def delete_artist(artist_id):
         flash('Artist was successfully deleted!')
     else:
         flash('There is an error, could not be deleted.')
-    return  render_template('pages/home.html')
+    return render_template('pages/home.html')
 
 
 #  Shows
