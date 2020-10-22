@@ -45,12 +45,13 @@ def create_app(test_config=None):
   def get_categories():
       categories= Category.query.order_by(Category.id).all()
      # curren_categories = paginated(request, categories)
+     formated_categories= [category.format() for category in categories]
       if len(categories) == 0:
           abort(404)
+
       return jsonify({
       'success' : True,
-      'categories' : categories,
-      'total_categories' : Category.query.count()
+      'categories' : formated_categories,
       })
 
 
@@ -86,8 +87,8 @@ def create_app(test_config=None):
        'success' : True,
        'questions' : current_questions,
        'total_questions' : Question.query.count(),
-       'current_category': current_category,
-       'categories': formated_categories
+       'categories': formated_categories,
+       'current_category': current_category
        })
 
 
@@ -207,6 +208,7 @@ def create_app(test_config=None):
   @app.route('/categories/<int:category_id>/questions')
   def get_questions_basedon_category(category_id):
       category= Category.query.get(category_id).one_or_none()
+      # abort error 404 page not found if there are no category
       if category == None:
           abort(404)
 
@@ -270,34 +272,41 @@ def create_app(test_config=None):
   @app.errorhandler(404)
   def not_found(error):
       return jsonify({
-         "success": False,
-         "error": 404,
-         "message": "resourse not found"
-         }), 404
+      "success": False,
+      "error": 404,
+      "message": "resourse not found"
+      }), 404
 
   @app.errorhandler(400)
   def bad_request(error):
       return jsonify({
-          "success": False,
-          "error": 400,
-          "message": "Bad request"
-          }), 400
+      "success": False,
+      "error": 400,
+      "message": "Bad request"
+      }), 400
 
   @app.errorhandler(405)
   def method_not_allowed(error):
       return jsonify({
-              "success": False,
-              "error": 405,
-              "message": "method not allowed"
-              }), 405
-
+      "success": False,
+      "error": 405,
+      "message": "method not allowed"
+      }), 405
 
   @app.errorhandler(422)
   def unprocessable(error):
       return jsonify({
-              "success": False,
-              "error": 422,
-              "message": "unprocessable"
-              }), 422
+      "success": False,
+      "error": 422,
+      "message": "unprocessable"
+      }), 422
+
+  @app.errorhandler(500)
+  def server_error(error):
+      return jsonify({
+      "success": False,
+      "error": 500,
+      "message": "Internal server error"
+      }), 500
 
   return app
