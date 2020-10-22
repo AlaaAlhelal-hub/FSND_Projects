@@ -1,10 +1,10 @@
-import os
+simport os
 from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import random
 
-from models import setup_db, Question, Category
+from models import setup_db, Question, Category, db
 
 QUESTIONS_PER_PAGE = 10
 
@@ -44,12 +44,12 @@ def create_app(test_config=None):
   @app.route('/categories')
   def get_categories():
       categories= Category.query.order_by(Category.id).all()
-      curren_categories = paginated(request, categories)
-      if len(curren_categories) == 0:
+     # curren_categories = paginated(request, categories)
+      if len(categories) == 0:
           abort(404)
       return jsonify({
       'success' : True,
-      'categories' : curren_categories,
+      'categories' : categories,
       'total_categories' : Category.query.count()
       })
 
@@ -69,16 +69,28 @@ def create_app(test_config=None):
   '''
   @app.route('/questions')
   def get_questions():
-      current_category = 
+      categories= Category.query.order_by(Category.id).all()
+      formated_categories = [category.format() for category in categories]
+      current_category = None #unspecified
       questions= Question.query.order_by(Question.id).all()
       current_questions = paginated(request, questions)
+
+      # abort error 404 page not found if there are no questions
       if len(current_questions) == 0:
           abort(404)
+      # abort error 404 page not found if there are no categories
+      if len(formated_categories) == 0:
+          abort(404)
+
       return jsonify({
        'success' : True,
        'questions' : current_questions,
-       'total_questions' : Question.query.count()
+       'total_questions' : Question.query.count(),
+       'current_category': current_category,
+       'categories': formated_categories
        })
+
+
 
   '''
   @TODO:
@@ -87,6 +99,25 @@ def create_app(test_config=None):
   TEST: When you click the trash icon next to a question, the question will be removed.
   This removal will persist in the database and when you refresh the page.
   '''
+  @app.route('/questions/<int:question_id>', methods=['DELETE'])
+  def delete_question(question_id):
+      try:
+          question = Question.query.get(question_id).one_or_none()
+          if question==None: #if question does not exist
+              abort(404)
+          else:
+              question.delete()
+              questions= Question.query.order_by(Question.id).all()
+              current_questions = paginated(request, questions)
+              return jsonify({
+              'success':True,
+              'deleted':question_id,
+              'current_questions':current_questions,
+              'total_questions' : Question.query.count()
+              })
+      except:
+          db.rollback()
+          abort(422)
 
   '''
   @TODO:
@@ -98,6 +129,31 @@ def create_app(test_config=None):
   the form will clear and the question will appear at the end of the last page
   of the questions list in the "List" tab.
   '''
+  @app.route('/questions', methods=['POST'])
+  def add_question():
+      data = request.get_json()
+      question = data.get('question', None)
+      answer = data.get('answer', None)
+      category = data.get('category', None)
+      difficulty = data.get('difficulty', None)
+      try:
+          question = Question(
+          question = question,
+          answer = answer,
+          category = category,
+          difficulty = difficulty)
+          question.insert()
+          questions= Question.query.order_by(Question.id).all()
+          current_questions = paginated(request, questions)
+          return jsonify({
+          'success':True,
+          'created':question.id,
+          'current_questions':current_questions,
+          'total_questions' : Question.query.count()
+          })
+      except:
+          db.rollback()
+          abort(405)
 
   '''
   @TODO:
@@ -109,6 +165,36 @@ def create_app(test_config=None):
   only question that include that string within their question.
   Try using the word "title" to start.
   '''
+  @app.route('/questions', methods=['POST'])
+  def search_for_questions():
+      data = request.get_json()
+      trem = data.get('search', None)
+      # Check if the search term is empty
+      if  trem == None:
+          abort(422)
+
+      search_term ='%'+trem+'%'
+      categories= Category.query.order_by(Category.id).all()
+      formated_categories = [category.format() for category in categories]
+      current_category = None #unspecified
+      questions= Question.query.order_by(Question.id).filter(Question.question.ilike(search_term)).all()
+      current_questions = paginated(request, questions)
+
+      # abort error 404 page not found if there are no questions
+      if len(current_questions) == 0:
+          abort(404)
+      # abort error 404 page not found if there are no categories
+      if len(formated_categories) == 0:
+          abort(404)
+
+      return jsonify({
+       'success' : True,
+       'questions' : current_questions,
+       'total_questions' : Question.query.count(),
+       'current_category': current_category,
+       'categories': formated_categories
+       })
+
 
   '''
   @TODO:
@@ -118,6 +204,26 @@ def create_app(test_config=None):
   categories in the left column will cause only questions of that
   category to be shown.
   '''
+  @app.route('/categories/<int:category_id>/questions')
+  def get_questions_basedon_category(category_id):
+      category= Category.query.get(category_id).one_or_none()
+      if category == None:
+          abort(404)
+
+      questions= Question.query.filter(Question.category==category.id).all()
+      current_questions = paginated(request, questions)
+
+      # abort error 404 page not found if there are no questions
+      if len(current_questions) == 0:
+          abort(404)
+
+      return jsonify({
+       'success' : True,
+       'questions' : current_questions,
+       'total_questions' : len(current_questions),
+       'current_category': category
+       })
+
 
 
   '''
@@ -131,14 +237,67 @@ def create_app(test_config=None):
   one question at a time is displayed, the user is allowed to answer
   and shown whether they were correct or not.
   '''
+  @app.route('/quizzes', methods=['POST'])
+  def play():
+      data = request.get_json()
+      quiz_category = data.get('quiz_category', None)
+      previous_questions = data.get('previous_questions', None)
+      # Check if the quiz category or previous question is none
+      if quiz_category == None or previous_questions == None:
+          abort(422)
+
+      questions= Question.query.filter(Question.category==quiz_category['id']).all()
+      filtering_questions = [ question if question.id not in previous_questions for question in questions ]
+      random_question
+
+      if len(filtering_questions) == 0:
+          random_question=None
+      else:#pick one question randomly
+          random_question= random.choice(filtering_questions).format()
+
+      return jsonify({
+       'success' : True,
+       'question' : random_question
+       })
+
 
   '''
   @TODO:
   Create error handlers for all expected errors
   including 404 and 422.
   '''
-  @app.route("/users")
-  def list_users():
-      return "user example"
+  #format error messages
+  @app.errorhandler(404)
+  def not_found(error):
+      return jsonify({
+         "success": False,
+         "error": 404,
+         "message": "resourse not found"
+         }), 404
+
+  @app.errorhandler(400)
+  def bad_request(error):
+      return jsonify({
+          "success": False,
+          "error": 400,
+          "message": "Bad request"
+          }), 400
+
+  @app.errorhandler(405)
+  def method_not_allowed(error):
+      return jsonify({
+              "success": False,
+              "error": 405,
+              "message": "method not allowed"
+              }), 405
+
+
+  @app.errorhandler(422)
+  def unprocessable(error):
+      return jsonify({
+              "success": False,
+              "error": 422,
+              "message": "unprocessable"
+              }), 422
 
   return app
