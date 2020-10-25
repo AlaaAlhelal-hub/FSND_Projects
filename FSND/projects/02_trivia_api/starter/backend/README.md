@@ -70,11 +70,12 @@ One note before you delve into your tasks: for each endpoint you are expected to
 ## Endpoints
 
 ### GET '/categories'
--General
-  - Fetches a dictionary of categories in which the keys are the ids and the value is the corresponding string of the category
-  - Request Arguments: None
-  - Returns: An object with a single key, categories, that contains a object of id: category_string key:value pairs.
--Sample : curl -X GET http://127.0.0.1:5000/categories
+  - General
+    - Fetches a dictionary of categories in which the keys are the ids and the value is the corresponding string of the category
+    - Request Arguments: None
+    - Returns: An object with a single key, categories, that contains a object of id: category_string key:value pairs.
+    
+  - Sample : curl -X GET http://127.0.0.1:5000/categories
 ```
 {
   "categories": [
