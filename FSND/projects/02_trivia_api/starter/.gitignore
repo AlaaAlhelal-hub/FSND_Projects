@@ -2,11 +2,12 @@
 __pycache__
 venv
 
-
-
+# Environmental variables
+.env
+# Virtual env folder
+env/
 # node modules
 frontend/node_modules/
-
 
 # OS generated files #
 ######################
