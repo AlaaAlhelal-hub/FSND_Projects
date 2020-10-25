@@ -1,10 +1,10 @@
-simport os
+import os
 from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import random
 
-from models import setup_db, Question, Category, db
+from models import setup_db, Question, Category
 
 QUESTIONS_PER_PAGE = 10
 
@@ -15,7 +15,7 @@ def create_app(test_config=None):
   '''
   @TODO: Set up CORS. Allow '*' for origins. Delete the sample route after completing the TODOs
   '''
-  CORS(app, resources={r"/api/*": {"origins": "*"}})
+  CORS(app, resources={r"*": {"origins": "*"}})
 
   '''
   @TODO: Use the after_request decorator to set Access-Control-Allow
@@ -23,11 +23,12 @@ def create_app(test_config=None):
   @app.after_request
   def after_request(response):
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,true')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PATCH,POST,DELETE,OPTIONS')
     return response
 
 
-  def paginated(request, selection):
+  def questions_paginated(request, selection):
       page = request.args.get('page', 1, type=int)
       start = (page - 1) * 10
       end = start + 10
@@ -44,14 +45,10 @@ def create_app(test_config=None):
   @app.route('/categories')
   def get_categories():
       categories= Category.query.order_by(Category.id).all()
-     # curren_categories = paginated(request, categories)
-     formated_categories= [category.format() for category in categories]
-      if len(categories) == 0:
-          abort(404)
-
+      formated_categories= [category.format() for category in categories]
       return jsonify({
       'success' : True,
-      'categories' : formated_categories,
+      'categories' : formated_categories
       })
 
 
@@ -72,26 +69,20 @@ def create_app(test_config=None):
   def get_questions():
       categories= Category.query.order_by(Category.id).all()
       formated_categories = [category.format() for category in categories]
-      current_category = None #unspecified
       questions= Question.query.order_by(Question.id).all()
-      current_questions = paginated(request, questions)
+      current_questions = questions_paginated(request, questions)
 
       # abort error 404 page not found if there are no questions
       if len(current_questions) == 0:
           abort(404)
-      # abort error 404 page not found if there are no categories
-      if len(formated_categories) == 0:
-          abort(404)
 
       return jsonify({
-       'success' : True,
-       'questions' : current_questions,
-       'total_questions' : Question.query.count(),
-       'categories': formated_categories,
-       'current_category': current_category
+       'success':True,
+       'questions':current_questions,
+       'total_questions':len(questions),
+       'categories':formated_categories,
+       'current_category': None
        })
-
-
 
   '''
   @TODO:
@@ -103,13 +94,13 @@ def create_app(test_config=None):
   @app.route('/questions/<int:question_id>', methods=['DELETE'])
   def delete_question(question_id):
       try:
-          question = Question.query.get(question_id).one_or_none()
+          question = Question.query.filter(Question.id==question_id).one_or_none()
           if question==None: #if question does not exist
               abort(404)
           else:
               question.delete()
               questions= Question.query.order_by(Question.id).all()
-              current_questions = paginated(request, questions)
+              current_questions = questions_paginated(request, questions)
               return jsonify({
               'success':True,
               'deleted':question_id,
@@ -117,7 +108,6 @@ def create_app(test_config=None):
               'total_questions' : Question.query.count()
               })
       except:
-          db.rollback()
           abort(422)
 
   '''
@@ -137,6 +127,11 @@ def create_app(test_config=None):
       answer = data.get('answer', None)
       category = data.get('category', None)
       difficulty = data.get('difficulty', None)
+
+      if question == None or answer == None \
+        or category == None or difficulty == None:
+        abort(400)
+
       try:
           question = Question(
           question = question,
@@ -145,7 +140,7 @@ def create_app(test_config=None):
           difficulty = difficulty)
           question.insert()
           questions= Question.query.order_by(Question.id).all()
-          current_questions = paginated(request, questions)
+          current_questions = questions_paginated(request, questions)
           return jsonify({
           'success':True,
           'created':question.id,
@@ -153,7 +148,6 @@ def create_app(test_config=None):
           'total_questions' : Question.query.count()
           })
       except:
-          db.rollback()
           abort(405)
 
   '''
@@ -166,10 +160,10 @@ def create_app(test_config=None):
   only question that include that string within their question.
   Try using the word "title" to start.
   '''
-  @app.route('/questions', methods=['POST'])
+  @app.route('/questions/search', methods=['POST'])
   def search_for_questions():
       data = request.get_json()
-      trem = data.get('search', None)
+      trem = data.get('searchTerm', None)
       # Check if the search term is empty
       if  trem == None:
           abort(422)
@@ -177,22 +171,14 @@ def create_app(test_config=None):
       search_term ='%'+trem+'%'
       categories= Category.query.order_by(Category.id).all()
       formated_categories = [category.format() for category in categories]
-      current_category = None #unspecified
       questions= Question.query.order_by(Question.id).filter(Question.question.ilike(search_term)).all()
-      current_questions = paginated(request, questions)
-
-      # abort error 404 page not found if there are no questions
-      if len(current_questions) == 0:
-          abort(404)
-      # abort error 404 page not found if there are no categories
-      if len(formated_categories) == 0:
-          abort(404)
+      current_questions = questions_paginated(request, questions)
 
       return jsonify({
        'success' : True,
        'questions' : current_questions,
        'total_questions' : Question.query.count(),
-       'current_category': current_category,
+       'current_category': None,
        'categories': formated_categories
        })
 
@@ -206,24 +192,20 @@ def create_app(test_config=None):
   category to be shown.
   '''
   @app.route('/categories/<int:category_id>/questions')
-  def get_questions_basedon_category(category_id):
-      category= Category.query.get(category_id).one_or_none()
+  def get_questions_based_on_category(category_id):
+      category= Category.query.filter(Category.id==category_id).one_or_none()
       # abort error 404 page not found if there are no category
       if category == None:
           abort(404)
 
       questions= Question.query.filter(Question.category==category.id).all()
-      current_questions = paginated(request, questions)
-
-      # abort error 404 page not found if there are no questions
-      if len(current_questions) == 0:
-          abort(404)
+      current_questions = questions_paginated(request, questions)
 
       return jsonify({
        'success' : True,
        'questions' : current_questions,
        'total_questions' : len(current_questions),
-       'current_category': category
+       'current_category': category.format()
        })
 
 
@@ -249,8 +231,9 @@ def create_app(test_config=None):
           abort(422)
 
       questions= Question.query.filter(Question.category==quiz_category['id']).all()
-      filtering_questions = [ question if question.id not in previous_questions for question in questions ]
-      random_question
+      filtering_questions = [ question for question in questions if question.id not in previous_questions]
+
+      random_question = None
 
       if len(filtering_questions) == 0:
           random_question=None

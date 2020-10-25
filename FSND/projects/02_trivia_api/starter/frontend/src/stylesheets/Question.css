@@ -8,6 +8,24 @@
   flex-shrink: 2;
 }
 
+
+.categories-list  ul > li{
+  height: auto;
+  width: 100%;
+  margin: auto;
+  margin-bottom: 15px;
+  display: flex;
+  align-items:center;
+  flex-direction: row;
+  justify-content: center;
+  padding: auto;
+}
+.categories-list ul li > img {
+  margin-left: 10px;
+}
+
+
+
 .categories-list > form {
   width: 60%;
 }
