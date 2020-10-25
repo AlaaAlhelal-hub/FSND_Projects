@@ -2,6 +2,12 @@
 __pycache__
 venv
 
+
+
+# node modules
+frontend/node_modules/
+
+
 # OS generated files #
 ######################
 .DS_Store
